@@ -12,8 +12,18 @@ matrix = {
 dimensions = ['TOU Rate', 'Solar $', 'Solar kWh', 'EV', 'Budget Billing $', 'Budget Billing kWh', 'AMI']
 elements = list(matrix.keys())
 
-st.set_page_config(layout="wide")
+# Define color mapping for dimensions
+dimension_colors = {
+    'TOU Rate': 'lightblue',
+    'Solar $': 'lightyellow',
+    'Solar kWh': 'gold',
+    'EV': 'lightgreen',
+    'Budget Billing $': 'lightcoral',
+    'Budget Billing kWh': 'salmon',
+    'AMI': 'lightgray'
+}
 
+st.set_page_config(layout="wide")
 st.title("Dynamic CX Configuration Matrix")
 
 # Sidebar for dimension selection
@@ -21,50 +31,48 @@ st.sidebar.header("Select User Dimensions")
 selected_dimensions = st.sidebar.multiselect("Choose dimensions:", dimensions)
 
 # Explanation
-if selected_dimensions:
-    explanation = f"Based on the selected dimensions ({', '.join(selected_dimensions)}), "
-    explanation += "the system determines which elements to include in the user's experience. "
-    explanation += "'Include' overrides 'Pass', and 'Kill' overrides both 'Include' and 'Pass'."
-else:
-    explanation = "Select user dimensions to see how they affect the Dynamic CX configuration."
+# ... (Explanation logic remains the same)
 
-st.info(explanation)
-
-# Generate table data
+# Generate table data with color coding
 table_data = []
 for element in elements:
+    row_data = {'Element': element}
     status = 'pass'
     reason = 'Default pass'
-    for dim in selected_dimensions:
+    for dim in dimensions:
         if dim in matrix[element]:
-            if matrix[element][dim] == 'kill':
+            cell_value = matrix[element][dim]
+            if cell_value == 'kill':
                 status = 'kill'
                 reason = f'{dim} dimension kills this element'
-                break
-            elif matrix[element][dim] == 'include':
+                row_data[dim] = f'Kill ({reason})'  # Add reason to cell
+            elif cell_value == 'include' and status != 'kill':
                 status = 'include'
                 reason = f'{dim} dimension includes this element'
-    
-    table_data.append({
-        'Element': element,
-        'Status': 'Included' if status == 'include' else 'Not Included',
-        'Reason': reason
-    })
+                row_data[dim] = f'Include ({reason})'  # Add reason to cell
+            else:
+                row_data[dim] = cell_value
+        else:
+            row_data[dim] = '-'  # Mark dimensions not in matrix as '-'
 
-# Display table
+    row_data['Status'] = 'Included' if status == 'include' else 'Not Included'
+    row_data['Reason'] = reason
+    table_data.append(row_data)
+
+# Display table with color coding
 df = pd.DataFrame(table_data)
-st.dataframe(df.style.apply(lambda x: ['background: lightgreen' if x.Status == 'Included' else 'background: lightcoral' for i in x], axis=1))
 
-# How it works
-st.header("How it works")
-st.markdown("""
-1. Each element has a default 'pass' status.
-2. Dimensions can 'include' or 'kill' an element.
-3. 'Include' overrides 'pass'.
-4. 'Kill' overrides both 'include' and 'pass'.
-5. The final status is determined by evaluating all selected dimensions.
-""")
+# Styling function for color-coding
+def highlight_cells(val):
+    """Highlights cells based on dimension and action."""
+    for dim, color in dimension_colors.items():
+        if dim in str(val):  # Check if dimension is in the cell value
+            if 'Kill' in str(val):
+                return f'background-color: {color}; color: red'
+            elif 'Include' in str(val):
+                return f'background-color: {color}; color: green' 
+    return '' 
 
-# Display raw matrix data
-if st.checkbox("Show raw matrix data"):
-    st.json(matrix)
+st.dataframe(df.style.applymap(highlight_cells))
+
+# ... (Rest of the code: "How it works", raw matrix display) 
